@@ -1,4 +1,4 @@
-package service;
+package ru.ssergeev.myblog.service;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,30 +35,30 @@ class CommentServiceTest {
         Comment comment1 = createTestComment(1L, 1L);
         Comment comment2 = createTestComment(2L, 1L);
 
-        when(commentRepository.findByPostId(1L))
+        Mockito.when(commentRepository.findByPostId(1L))
                 .thenReturn(Arrays.asList(comment1, comment2));
 
         // Act
         List<Comment> result = commentService.getCommentsByPostId(1L);
 
         // Assert
-        assertEquals(2, result.size());
-        verify(commentRepository).findByPostId(1L);
+        Assertions.assertEquals(2, result.size());
+        Mockito.verify(commentRepository).findByPostId(1L);
     }
 
     @Test
     void getComment_ShouldReturnComment() {
         // Arrange
         Comment comment = createTestComment(1L, 1L);
-        when(commentRepository.findById(1L)).thenReturn(Optional.of(comment));
+        Mockito.when(commentRepository.findById(1L)).thenReturn(Optional.of(comment));
 
         // Act
         Optional<Comment> result = commentService.getComment(1L);
 
         // Assert
-        assertTrue(result.isPresent());
-        assertEquals(1L, result.get().getId());
-        verify(commentRepository).findById(1L);
+        Assertions.assertTrue(result.isPresent());
+        Assertions.assertEquals(1L, result.get().getId());
+        Mockito.verify(commentRepository).findById(1L);
     }
 
     @Test
@@ -67,15 +67,15 @@ class CommentServiceTest {
         Comment commentToSave = createTestComment(null, 1L);
         Comment savedComment = createTestComment(1L, 1L);
 
-        when(commentRepository.save(any(Comment.class))).thenReturn(savedComment);
+        Mockito.when(commentRepository.save(ArgumentMatchers.any(Comment.class))).thenReturn(savedComment);
 
         // Act
         Comment result = commentService.createComment(commentToSave);
 
         // Assert
-        assertNotNull(result.getId());
-        assertNotNull(result.getCreatedAt());
-        verify(commentRepository).save(argThat(comment ->
+        Assertions.assertNotNull(result.getId());
+        Assertions.assertNotNull(result.getCreatedAt());
+        Mockito.verify(commentRepository).save(ArgumentMatchers.argThat(comment ->
                 comment.getCreatedAt() != null
         ));
     }
@@ -89,41 +89,41 @@ class CommentServiceTest {
         Comment updateData = createTestComment(1L, 1L);
         updateData.setText("Updated Text");
 
-        when(commentRepository.findById(1L)).thenReturn(Optional.of(existingComment));
-        when(commentRepository.update(any(Comment.class))).thenReturn(updateData);
+        Mockito.when(commentRepository.findById(1L)).thenReturn(Optional.of(existingComment));
+        Mockito.when(commentRepository.update(ArgumentMatchers.any(Comment.class))).thenReturn(updateData);
 
         // Act
         Comment result = commentService.updateComment(updateData);
 
         // Assert
-        assertEquals("Updated Text", result.getText());
-        assertEquals(existingComment.getCreatedAt(), result.getCreatedAt()); // Время создания сохраняется
+        Assertions.assertEquals("Updated Text", result.getText());
+        Assertions.assertEquals(existingComment.getCreatedAt(), result.getCreatedAt()); // Время создания сохраняется
 
-        verify(commentRepository).findById(1L);
-        verify(commentRepository).update(any(Comment.class));
+        Mockito.verify(commentRepository).findById(1L);
+        Mockito.verify(commentRepository).update(ArgumentMatchers.any(Comment.class));
     }
 
     @Test
     void updateComment_NonExistingComment_ShouldThrowException() {
         // Arrange
         Comment comment = createTestComment(999L, 1L);
-        when(commentRepository.findById(999L)).thenReturn(Optional.empty());
+        Mockito.when(commentRepository.findById(999L)).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThrows(IllegalArgumentException.class,
+        Assertions.assertThrows(IllegalArgumentException.class,
                 () -> commentService.updateComment(comment));
     }
 
     @Test
     void deleteComment_ShouldDeleteExistingComment() {
         // Arrange
-        when(commentRepository.findById(1L)).thenReturn(Optional.of(createTestComment(1L, 1L)));
+        Mockito.when(commentRepository.findById(1L)).thenReturn(Optional.of(createTestComment(1L, 1L)));
 
         // Act
         commentService.deleteComment(1L);
 
         // Assert
-        verify(commentRepository).delete(1L);
+        Mockito.verify(commentRepository).delete(1L);
     }
 
     private Comment createTestComment(Long id, Long postId) {
