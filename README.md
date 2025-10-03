@@ -1,11 +1,8 @@
-# myBlogPracticum
-Создайте приложение-блог с использованием Spring Framework
-
-MyBlog Backend app
-Spring Framework-based backend for a blog application with REST API.
+MyBlog Backend Application (Spring Boot)
+Spring Boot-based backend for a blog application with REST API.
 
 📋 О проекте
-Бэкенд-приложение для блога, реализованное на Spring Framework 6.1+ без использования Spring Boot. Приложение предоставляет REST API для управления постами, комментариями, лайками и изображениями.
+Бэкенд-приложение для блога, реализованное на Spring Boot 3.2+. Приложение предоставляет REST API для управления постами, комментариями, лайками и изображениями. Мигрировано с Spring Framework на Spring Boot с сохранением всей функциональности.
 
 🚀 Функциональность
 ✅ Создание, редактирование, удаление постов
@@ -22,24 +19,43 @@ Spring Framework-based backend for a blog application with REST API.
 
 ✅ In-memory база данных H2
 
-✅ Юнит и интеграционные тесты
+✅ Юнит и интеграционные тесты с Spring Boot Test
+
+✅ Executable JAR со встроенным Tomcat
 
 🛠 Технологии
 Java 21
 
-Spring Framework 6.1.0
+Spring Boot 3.2.0
 
-Spring MVC, Spring JDBC
+Spring Web, Spring Data JDBC, Spring Boot Test
 
 H2 Database (in-memory)
 
-Maven для сборки
+Gradle для сборки
 
 JUnit 5, Mockito для тестирования
 
-Tomcat 10+ / Jetty 11+ для деплоя
+Embedded Tomcat (встроенный сервлет-контейнер)
 
-📚 API Endpoints
+🔄 Миграционные изменения
+Что было изменено при переходе на Spring Boot:
+✅ Заменен Maven на Gradle для сборки
+
+✅ Удалены ручные конфигурации Spring (@Configuration классы)
+
+✅ Удален web.xml и конфигурация деплоя WAR
+
+✅ Добавлен встроенный Tomcat сервер
+
+✅ Тесты переписаны на Spring Boot Test
+
+✅ Добавлена автоконфигурация Spring Boot
+
+✅ Приложение запускается как standalone JAR
+
+🌐 API Endpoints
+
 Посты
 Метод	Endpoint	Описание
 GET	/api/posts?search=текст&pageNumber=1&pageSize=10	Список постов с пагинацией
@@ -51,34 +67,10 @@ POST	/api/posts/{id}/likes	Поставить лайк
 PUT	/api/posts/{id}/image	Загрузить изображение
 GET	/api/posts/{id}/image	Получить изображение
 
-🚀 Быстрый старт
-Предварительные требования
-Java 21 или выше
-
-Maven 3.6+
-
-Tomcat 10+ или Jetty 11+
-
-🌐 Деплой в сервлет-контейнер
-
-Установка Tomcat
-Скачайте Tomcat 10+ с официального сайта
-
-Распакуйте в удобную директорию
-
-Деплой в Tomcat
-
-🧪 Тестирование
-Запуск тестов
-bash
-# Все тесты
-mvn test
-
-# С генерацией отчета
-mvn test surefire-report:report
-Структура тестов
-Unit тесты: *Test.java - тестирование сервисов с Mockito
-
-Интеграционные тесты: *IntegrationTest.java - тестирование с реальной БД
-
-Тестовые данные: src/test/resources/db/test-data.sql
+Комментарии
+Метод	Endpoint	Описание
+GET	/api/posts/{postId}/comments	Комментарии поста
+GET	/api/posts/{postId}/comments/{commentId}	Получить комментарий
+POST	/api/posts/{postId}/comments	Добавить комментарий
+PUT	/api/posts/{postId}/comments/{commentId}	Обновить комментарий
+DELETE	/api/posts/{postId}/comments/{commentId}	Удалить комментарий

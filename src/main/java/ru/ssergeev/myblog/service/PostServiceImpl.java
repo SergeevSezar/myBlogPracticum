@@ -20,16 +20,11 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public List<Post> getPosts(int pageNumber, int pageSize, String search) {
+        log.debug("Getting posts: pageNumber={}, pageSize={}, search='{}'", pageNumber, pageSize, search);
 
-        if (pageNumber < 1) {
-            throw new IllegalArgumentException("Page number must be greater than 0");
-        }
-        if (pageSize < 1) {
-            throw new IllegalArgumentException("Page size must be greater than 0");
-        }
+        validatePaginationParams(pageNumber, pageSize);
 
         List<Post> posts = postRepository.findAll(pageNumber, pageSize, search);
-
         posts.forEach(this::truncateTextForList);
 
         return posts;
@@ -37,16 +32,15 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public Optional<Post> getPost(Long id) {
-        if (id == null || id <= 0) {
-            throw new IllegalArgumentException("Post ID must be positive");
-        }
-
+        log.debug("Getting post by id: {}", id);
+        validatePostId(id);
         return postRepository.findById(id);
     }
 
     @Override
     @Transactional
     public Post createPost(Post post) {
+        log.debug("Creating new post: {}", post.getTitle());
 
         validatePost(post);
 
@@ -55,105 +49,100 @@ public class PostServiceImpl implements PostService {
         post.setCreatedAt(LocalDateTime.now());
         post.setUpdatedAt(LocalDateTime.now());
 
-        return postRepository.save(post);
+        Post savedPost = postRepository.save(post);
+        log.info("Post created successfully with id: {}", savedPost.getId());
+
+        return savedPost;
     }
 
     @Override
     @Transactional
     public Post updatePost(Post post) {
+        log.debug("Updating post with id: {}", post.getId());
 
-        if (post.getId() == null || post.getId() <= 0) {
-            throw new IllegalArgumentException("Post ID must be positive");
-        }
-
+        validatePostId(post.getId());
         validatePost(post);
 
-        Optional<Post> existingPost = postRepository.findById(post.getId());
-        if (existingPost.isEmpty()) {
-            throw new IllegalArgumentException("Post not found with id: " + post.getId());
-        }
+        Post existingPost = postRepository.findById(post.getId())
+                .orElseThrow(() -> new RuntimeException(post.getId().toString()));
 
-        post.setLikesCount(existingPost.get().getLikesCount());
-        post.setCommentsCount(existingPost.get().getCommentsCount());
-        post.setCreatedAt(existingPost.get().getCreatedAt());
-        post.setImage(existingPost.get().getImage());
+        // Сохраняем неизменяемые поля
+        post.setLikesCount(existingPost.getLikesCount());
+        post.setCommentsCount(existingPost.getCommentsCount());
+        post.setCreatedAt(existingPost.getCreatedAt());
+        post.setImage(existingPost.getImage());
         post.setUpdatedAt(LocalDateTime.now());
 
-        return postRepository.update(post);
+        Post updatedPost = postRepository.update(post);
+        log.info("Post updated successfully with id: {}", updatedPost.getId());
+
+        return updatedPost;
     }
 
     @Override
     @Transactional
     public void deletePost(Long id) {
+        log.debug("Deleting post with id: {}", id);
 
-        if (id == null || id <= 0) {
-            throw new IllegalArgumentException("Post ID must be positive");
-        }
+        validatePostId(id);
 
-        Optional<Post> existingPost = postRepository.findById(id);
-        if (existingPost.isEmpty()) {
-            throw new IllegalArgumentException("Post not found with id: " + id);
+        if (!postRepository.findById(id).isPresent()) {
+            throw new RuntimeException(id.toString());
         }
 
         postRepository.delete(id);
+        log.info("Post deleted successfully with id: {}", id);
     }
 
     @Override
     @Transactional
     public int likePost(Long id) {
+        log.debug("Incrementing likes for post with id: {}", id);
 
-        if (id == null || id <= 0) {
-            throw new IllegalArgumentException("Post ID must be positive");
-        }
+        validatePostId(id);
 
-        Optional<Post> existingPost = postRepository.findById(id);
-        if (existingPost.isEmpty()) {
-            throw new IllegalArgumentException("Post not found with id: " + id);
+        if (!postRepository.findById(id).isPresent()) {
+            throw new RuntimeException(id.toString());
         }
 
         postRepository.incrementLikes(id);
 
-        Optional<Post> updatedPost = postRepository.findById(id);
+        int likesCount = postRepository.findById(id)
+                .map(Post::getLikesCount)
+                .orElse(0);
 
-        return updatedPost.map(Post::getLikesCount).orElse(0);
+        log.info("Likes incremented for post id: {}, new likes count: {}", id, likesCount);
+        return likesCount;
     }
 
     @Override
     @Transactional
     public void updatePostImage(Long id, byte[] image) {
+        log.debug("Updating image for post with id: {}", id);
 
-        if (id == null || id <= 0) {
-            throw new IllegalArgumentException("Post ID must be positive");
-        }
+        validatePostId(id);
+        validateImageData(image);
 
-        if (image == null || image.length == 0) {
-            throw new IllegalArgumentException("Image data cannot be null or empty");
-        }
-
-        Optional<Post> existingPost = postRepository.findById(id);
-        if (existingPost.isEmpty()) {
-            throw new IllegalArgumentException("Post not found with id: " + id);
+        if (!postRepository.findById(id).isPresent()) {
+            throw new RuntimeException(id.toString());
         }
 
         postRepository.updateImage(id, image);
+        log.info("Image updated for post with id: {}", id);
     }
 
     @Override
     public byte[] getPostImage(Long id) {
+        log.debug("Getting image for post with id: {}", id);
 
-        if (id == null || id <= 0) {
-            throw new IllegalArgumentException("Post ID must be positive");
-        }
+        validatePostId(id);
 
-        // Проверяем существование поста
-        Optional<Post> existingPost = postRepository.findById(id);
-        if (existingPost.isEmpty()) {
-            throw new IllegalArgumentException("Post not found with id: " + id);
-        }
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException(id.toString()));
 
         byte[] image = postRepository.getImage(id);
         if (image == null || image.length == 0) {
-            throw new IllegalArgumentException("Image not found for post with id: " + id);
+            throw new RuntimeException("Image not found for post with id: " + id);
         }
 
         return image;
@@ -183,58 +172,49 @@ public class PostServiceImpl implements PostService {
         return postRepository.getTotalPages(pageSize, search);
     }
 
-    /**
-     * Валидация данных поста перед сохранением/обновлением
-     */
+    // Валидационные методы
+    private void validatePostId(Long id) {
+        if (id == null || id <= 0) {
+            throw new RuntimeException("Post ID must be positive");
+        }
+    }
+
+    private void validatePaginationParams(int pageNumber, int pageSize) {
+        if (pageNumber < 1) {
+            throw new RuntimeException("Page number must be greater than 0");
+        }
+        if (pageSize < 1) {
+            throw new RuntimeException("Page size must be greater than 0");
+        }
+    }
+
     private void validatePost(Post post) {
         if (post == null) {
-            throw new IllegalArgumentException("Post cannot be null");
+            throw new RuntimeException("Post cannot be null");
         }
-
         if (post.getTitle() == null || post.getTitle().trim().isEmpty()) {
-            throw new IllegalArgumentException("Post title cannot be empty");
+            throw new RuntimeException("Post title cannot be empty");
         }
-
         if (post.getText() == null || post.getText().trim().isEmpty()) {
-            throw new IllegalArgumentException("Post text cannot be empty");
+            throw new RuntimeException("Post text cannot be empty");
         }
-
         if (post.getTitle().length() > 255) {
-            throw new IllegalArgumentException("Post title cannot exceed 255 characters");
-        }
-
-        if (post.getTags() != null) {
-            for (String tag : post.getTags()) {
-                if (tag != null && tag.length() > 50) {
-                    throw new IllegalArgumentException("Tag cannot exceed 50 characters: " + tag);
-                }
-            }
+            throw new RuntimeException("Post title cannot exceed 255 characters");
         }
     }
 
-    /**
-     * Обрезает текст поста до 128 символов для отображения в списке
-     */
+    private void validateImageData(byte[] image) {
+        if (image == null || image.length == 0) {
+            throw new RuntimeException("Image data cannot be null or empty");
+        }
+        if (image.length > 10 * 1024 * 1024) { // 10MB limit
+            throw new RuntimeException("Image size cannot exceed 10MB");
+        }
+    }
+
     private void truncateTextForList(Post post) {
         if (post.getText() != null && post.getText().length() > 128) {
-            String truncatedText = post.getText().substring(0, 128) + "…";
-            post.setText(truncatedText);
+            post.setText(post.getText().substring(0, 128) + "…");
         }
-    }
-
-    /**
-     * Получение полного текста поста (без обрезки)
-     * Вспомогательный метод для внутреннего использования
-     */
-    public String getFullPostText(Long id) {
-        Optional<Post> post = postRepository.findById(id);
-        return post.map(Post::getText).orElse(null);
-    }
-
-    /**
-     * Получение количества постов (для статистики)
-     */
-    public long getTotalPostsCount(String search) {
-        return getLastPage(1, search);
     }
 }

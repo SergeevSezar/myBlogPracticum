@@ -1,6 +1,5 @@
 package ru.ssergeev.myblog.repository;
 
-import lombok.SneakyThrows;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -28,10 +27,10 @@ public class JdbcPostRepository implements PostRepository {
         post.setTitle(rs.getString("title"));
         post.setText(rs.getString("text"));
 
-        // Обработка массива тегов
-        Array tagsArray = rs.getArray("tags");
-        if (tagsArray != null) {
-            String[] tags = (String[]) tagsArray.getArray();
+        String tagsString = rs.getString("tags");
+        if (tagsString != null && !tagsString.isEmpty()) {
+            String cleaned = tagsString.replace("{", "").replace("}", "");
+            String[] tags = cleaned.split(",");
             post.setTags(Arrays.asList(tags));
         } else {
             post.setTags(List.of());
@@ -40,16 +39,8 @@ public class JdbcPostRepository implements PostRepository {
         post.setLikesCount(rs.getInt("likes_count"));
         post.setCommentsCount(rs.getInt("comments_count"));
         post.setImage(rs.getBytes("image"));
-
-        Timestamp createdAt = rs.getTimestamp("created_at");
-        if (createdAt != null) {
-            post.setCreatedAt(createdAt.toLocalDateTime());
-        }
-
-        Timestamp updatedAt = rs.getTimestamp("updated_at");
-        if (updatedAt != null) {
-            post.setUpdatedAt(updatedAt.toLocalDateTime());
-        }
+        post.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+        post.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
 
         return post;
     };
@@ -61,9 +52,9 @@ public class JdbcPostRepository implements PostRepository {
             SELECT p.*, 
                    (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) as comments_count
             FROM posts p
-            WHERE (? IS NULL OR p.title ILIKE ? OR EXISTS (
-                SELECT 1 FROM unnest(p.tags) AS tag 
-                WHERE tag ILIKE ?
+            WHERE (? IS NULL OR LOWER(p.title) LIKE LOWER(?) OR EXISTS (
+                SELECT 1 FROM TABLE(tags) t 
+                WHERE LOWER(t.COLUMN_VALUE) LIKE LOWER(?)
             ))
             ORDER BY p.created_at DESC
             LIMIT ? OFFSET ?
@@ -97,8 +88,14 @@ public class JdbcPostRepository implements PostRepository {
             PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, post.getTitle());
             ps.setString(2, post.getText());
-            ps.setArray(3, connection.createArrayOf("VARCHAR",
-                    post.getTags() != null ? post.getTags().toArray() : new String[0]));
+
+            if (post.getTags() != null && !post.getTags().isEmpty()) {
+                String tagsString = "{" + String.join(",", post.getTags()) + "}";
+                ps.setString(3, tagsString);
+            } else {
+                ps.setString(3, "{}");
+            }
+
             ps.setInt(4, post.getLikesCount());
             ps.setBytes(5, post.getImage());
             ps.setTimestamp(6, Timestamp.valueOf(post.getCreatedAt()));
@@ -113,7 +110,6 @@ public class JdbcPostRepository implements PostRepository {
     }
 
     @Override
-    @SneakyThrows
     public Post update(Post post) {
         String sql = """
             UPDATE posts 
@@ -121,11 +117,12 @@ public class JdbcPostRepository implements PostRepository {
             WHERE id = ?
             """;
 
+        String tagsString = "{" + String.join(",", post.getTags()) + "}";
+
         jdbcTemplate.update(sql,
                 post.getTitle(),
                 post.getText(),
-                jdbcTemplate.getDataSource().getConnection().createArrayOf("VARCHAR",
-                        post.getTags() != null ? post.getTags().toArray() : new String[0]),
+                tagsString,
                 Timestamp.valueOf(post.getUpdatedAt()),
                 post.getId());
 
@@ -161,9 +158,9 @@ public class JdbcPostRepository implements PostRepository {
         String sql = """
             SELECT COUNT(*) 
             FROM posts p
-            WHERE (? IS NULL OR p.title ILIKE ? OR EXISTS (
-                SELECT 1 FROM unnest(p.tags) AS tag 
-                WHERE tag ILIKE ?
+            WHERE (? IS NULL OR LOWER(p.title) LIKE LOWER(?) OR EXISTS (
+                SELECT 1 FROM TABLE(tags) t 
+                WHERE LOWER(t.COLUMN_VALUE) LIKE LOWER(?)
             ))
             """;
 
